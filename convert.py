@@ -6,33 +6,40 @@ def convert_svg_to_png():
     output_dir = "converted_pngs"
     os.makedirs(output_dir, exist_ok=True)
     
-    # 遍历当前目录
     success = 0
     failed = 0
     
     for filename in os.listdir('.'):
         if filename.lower().endswith('.svg'):
             try:
-                # 生成输出路径
+                # 读取 SVG 内容
+                with open(filename, "r", encoding="utf-8") as f:
+                    svg_data = f.read()
+                
+                # 替换填充颜色
+                svg_data = svg_data.replace('fill="currentColor"', 'fill="#888888"')
+                svg_data = svg_data.replace('fill:#000', 'fill:#888888')  # 处理样式内填色
+
+                # 输出 PNG 路径
                 base_name = os.path.splitext(filename)[0]
                 output_path = os.path.join(output_dir, f"{base_name}.png")
-                
-                # 转换文件
+
+                # 转换为 PNG
                 cairosvg.svg2png(
-                    url=filename,
+                    bytestring=svg_data.encode('utf-8'),
                     write_to=output_path,
-                    output_width=1024,  # 可选：设置默认宽度
-                    output_height=768   # 可选：设置默认高度
+                    output_width=128,
+                    output_height=128
                 )
                 print(f"✅ 转换成功: {filename} → {output_path}")
                 success += 1
             except Exception as e:
                 print(f"❌ 转换失败: {filename} - 错误信息: {str(e)}")
                 failed += 1
-    
-    # 输出统计结果
+
+    # 输出结果
     print(f"\n转换完成！成功 {success} 个，失败 {failed} 个")
-    print(f"PNG 文件已保存至: {os.path.abspath(output_dir)}")
+    print(f"PNG 文件保存在: {os.path.abspath(output_dir)}")
 
 if __name__ == "__main__":
     convert_svg_to_png()
