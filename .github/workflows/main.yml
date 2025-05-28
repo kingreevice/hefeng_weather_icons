@@ -1,0 +1,36 @@
+name: SVG to PNG Converter
+
+on:
+  push:
+    paths:
+      - 'input/**'  # 当 input 目录有变化时触发
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get install -y python3-dev libxml2-dev libxslt-dev  # 系统依赖
+        pip install svglib reportlab
+
+    - name: Run conversion
+      run: python scripts/convert.py input output
+
+    - name: Commit converted files
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        git add output/
+        git commit -m "Auto-commit converted PNG files" || echo "No changes to commit"
+        git push
