@@ -3,7 +3,7 @@ name: SVG to PNG Converter
 on:
   push:
     paths:
-      - 'input/**'  # 当 input 目录有变化时触发
+      - '**.svg'  # 当任何 SVG 文件发生变化时触发
   workflow_dispatch:  # 允许手动触发
 
 jobs:
@@ -13,24 +13,43 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # 获取完整提交历史
 
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.x'
+        python-version: '3.10'
 
     - name: Install dependencies
       run: |
-        sudo apt-get install -y python3-dev libxml2-dev libxslt-dev  # 系统依赖
-        pip install svglib reportlab
+        sudo apt-get install -y libcairo2  # Cairo 依赖
+        pip install cairosvg
 
-    - name: Run conversion
-      run: python scripts/convert.py input output
+    - name: Convert SVG to PNG
+      run: |
+        # 创建输出目录
+        mkdir -p png_output
+        
+        # 批量转换脚本
+        find . -name '*.svg' -exec sh -c '
+          for svg_file do
+            base_name=$(basename "$svg_file" .svg)
+            png_file="png_output/${base_name}.png"
+            echo "Converting: $svg_file → $png_file"
+            cairosvg "$svg_file" -o "$png_file" --dpi 150
+          done
+        ' sh {} +
 
-    - name: Commit converted files
+    - name: Commit and push results
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
-        git add output/
-        git commit -m "Auto-commit converted PNG files" || echo "No changes to commit"
-        git push
+        git add png_output/
+        
+        if git diff-index --quiet HEAD --; then
+          echo "No changes to commit"
+        else
+          git commit -m "Auto-generated PNG files [skip ci]"  # [skip ci] 避免循环触发
+          git push origin HEAD:${{ github.ref_name }}
+        fi
