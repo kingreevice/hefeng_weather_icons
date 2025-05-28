@@ -7,37 +7,73 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write  # 关键权限声明
+  contents: write  # 必须的写入权限
 
 jobs:
   convert:
     runs-on: ubuntu-latest
+    timeout-minutes: 10  # 防止超时
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}  # 优先使用 PAT
+        token: ${{ secrets.GITHUB_TOKEN }}
         fetch-depth: 0
 
-    # ... (保持之前的安装和转换步骤)
+    - name: Debug pre-conversion
+      run: |
+        echo "### 转换前目录结构 ###"
+        ls -R
+        echo "### SVG文件列表 ###"
+        find . -name '*.svg'
+
+    - name: Setup environment
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y libcairo2  # Cairo 运行时依赖
+        pip install --quiet cairosvg
+
+    - name: Convert SVG to PNG
+      run: |
+        mkdir -p png_output
+        
+        # 精确查找 SVG 文件
+        find . -type f -name '*.svg' ! -path './.git/*' ! -path './png_output/*' | while read svg_file; do
+          echo "正在处理: $svg_file"
+          base_name=$(basename "$svg_file" .svg)
+          png_path="png_output/${base_name}.png"
+          
+          # 带错误捕获的转换
+          if cairosvg "$svg_file" -o "$png_path"; then
+            echo "生成成功 → $png_path"
+            ls -l "$png_path"
+          else
+            echo "转换失败: $svg_file" >&2
+            exit 1  # 立即终止并报错
+          fi
+        done
+
+    - name: Validate output
+      run: |
+        echo "### 转换后目录结构 ###"
+        ls -R png_output
+        [ "$(ls -A png_output)" ] || (echo "错误：输出目录为空！"; exit 1)
 
     - name: Commit and push
       run: |
-        # 配置 git 身份
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
         
-        # 同步最新代码（处理分支保护）
-        git pull origin ${{ github.ref_name }} --rebase
+        # 必须的同步操作
+        git pull origin ${{ github.ref_name }} --rebase --quiet
         
-        # 只添加 png_output 目录
-        git add png_output/
+        # 精确添加文件
+        find png_output -name '*.png' -exec git add {} \;
         
-        # 提交并推送
         if ! git diff-index --quiet HEAD --; then
           git commit -m "Auto: 生成 PNG 文件 [skip ci]"
-          git push origin HEAD:${{ github.ref_name }}
+          git push origin HEAD:${{ github.ref_name }} --verbose
         else
           echo "没有需要提交的更改"
         fi
