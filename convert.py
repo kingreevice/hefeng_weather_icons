@@ -18,7 +18,7 @@ def convert_svg_to_png():
                 
                 # 替换填充颜色
                 #svg_data = svg_data.replace('fill="currentColor"', 'fill="#888888"')
-                svg_data = svg_data.replace('fill:#000', 'fill:#888888')  # 处理样式内填色
+                svg_data = svg_data.replace('fill:#000', 'fill:#00000')  # 处理样式内填色
 
                 # 输出 PNG 路径
                 base_name = os.path.splitext(filename)[0]
